@@ -3,68 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fixed Minimal Clock</title>
+    <title>Aptos Clock with Fireworks</title>
     <style>
         body {
-            background-color: #ffffff; /* พื้นหลังเว็บสีขาว */
+            background-color: #ffffff;
             color: #333;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 2000px; /* เพิ่มความสูงเพื่อให้ลองเลื่อนหน้าจอ */
+            font-family: 'Aptos', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 200vh;
         }
 
-        /* นาฬิกาแบบล็อคติดหน้าจอ */
+        /* นาฬิกาล็อคติดหน้าจอ */
         .fixed-clock {
-            position: fixed; /* ล็อคตำแหน่งไว้กับหน้าจอ */
-            top: 15px;      /* ระยะห่างจากด้านบน */
-            right: 15px;    /* ระยะห่างจากด้านขวา */
-            background-color: #ffffff; /* พื้นหลังนาฬิกาสีขาว */
-            color: #333;
-            padding: 8px 15px;
-            border-radius: 8px;
-            border: 1px solid #ddd; /* เส้นขอบอ่อนๆ ให้ดูมีมิติ */
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* เงาบางๆ */
-            z-index: 9999;  /* ให้อยู่เลเยอร์บนสุดเสมอ */
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #222;
+            padding: 10px 20px;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            z-index: 10000; /* ให้อยู่เหนือพลุ */
             text-align: center;
+            backdrop-filter: blur(5px);
         }
 
         #clock {
-            font-size: 1.1rem;
-            font-weight: bold;
-            font-family: 'Courier New', Courier, monospace; /* ฟอนต์นาฬิกา */
+            font-size: 1.4rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
         }
 
-        .content-area {
-            padding: 50px;
+        /* Canvas สำหรับพลุ */
+        #fireworks-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* ให้คลิกทะลุผ่านได้ */
+            z-index: 9999;
         }
+
+        .content { padding: 50px; }
     </style>
 </head>
 <body>
+
+    <canvas id="fireworks-canvas"></canvas>
 
     <div class="fixed-clock">
         <div id="clock">00:00:00</div>
     </div>
 
-    <div class="content-area">
-        <h1>ทดสอบการเลื่อนหน้าจอ</h1>
-        <p>ลอง Scroll เมาส์ลงไปด้านล่างดูครับ...</p>
-        <p>↓</p>
-        <p>↓</p>
-        <p>นาฬิกาสีขาวที่มุมขวาจะยังคงลอยอยู่ที่เดิมเสมอ!</p>
+    <div class="content">
+        <h1>ยินดีต้อนรับ</h1>
+        <p>นาฬิกาจะจุดพลุฉลองทุกๆ ต้นชั่วโมง (เช่น 12:00, 13:00)</p>
     </div>
 
     <script>
+        const canvas = document.getElementById('fireworks-canvas');
+        const ctx = canvas.getContext('2d');
+        const clockElement = document.getElementById('clock');
+        let particles = [];
+
+        // ปรับขนาด Canvas ให้เต็มจอเสมอ
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.velocity = {
+                    x: (Math.random() - 0.5) * 8,
+                    y: (Math.random() - 0.5) * 8
+                };
+                this.alpha = 1;
+                this.friction = 0.95;
+            }
+            draw() {
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+            update() {
+                this.velocity.x *= this.friction;
+                this.velocity.y *= this.friction;
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.alpha -= 0.01;
+            }
+        }
+
+        function createFirework() {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * (canvas.height * 0.5);
+            const color = `hsl(${Math.random() * 360}, 50%, 50%)`;
+            for (let i = 0; i < 30; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach((p, i) => {
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    p.update();
+                    p.draw();
+                }
+            });
+            requestAnimationFrame(animate);
+        }
+        animate();
+
         function updateClock() {
             const now = new Date();
-            const timeStr = now.getHours().toString().padStart(2, '0') + ":" + 
-                            now.getMinutes().toString().padStart(2, '0') + ":" + 
-                            now.getSeconds().toString().padStart(2, '0');
-            document.getElementById('clock').textContent = timeStr;
+            const h = now.getHours();
+            const m = now.getMinutes();
+            const s = now.getSeconds();
+            
+            clockElement.textContent = 
+                `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+
+            // เงื่อนไข: ถ้าเป็นนาทีที่ 0 และวินาทีที่ 0 (ต้นชั่วโมงพอดี)
+            if (m === 0 && s === 0) {
+                for(let i=0; i<5; i++) { // จุดพลุ 5 ลูก
+                    setTimeout(createFirework, i * 300);
+                }
+            }
         }
+
         setInterval(updateClock, 1000);
         updateClock();
-    </script>
 
+        // ทดสอบ: ถ้าอยากดูพลุเลยตอนนี้โดยไม่ต้องรอต้นชั่วโมง 
+        // ให้ลองพิมพ์ createFirework() ใน Console ของ Browser นะครับ
+    </script>
 </body>
 </html>
