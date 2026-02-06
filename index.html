@@ -1,7 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>นาฬิกาดิจิทัลของฉัน</title>
+    <style>
+        /* ตกแต่งหน้าตา */
+        body {
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .clock-container {
+            color: #00ffcc;
+            background: #333;
+            padding: 40px 60px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        #clock {
+            font-size: 80px;
+            font-weight: bold;
+            letter-spacing: 5px;
+        }
+
+        .date {
+            font-size: 20px;
+            color: #888;
+            margin-top: 10px;
+        }
+    </style>
+</head>
 <body>
-  <h1>สวัสดีครับ! นี่คือเว็บแรกของฉันบน GitHub</h1>
-  <p>ยินดีต้อนรับสู่โลกของการเขียนเว็บ</p>
+
+    <div class="clock-container">
+        <div id="clock">00:00:00</div>
+        <div id="date" class="date">กำลังโหลดวันที่...</div>
+    </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            
+            // ดึงเวลา
+            let hours = now.getHours().toString().padStart(2, '0');
+            let minutes = now.getMinutes().toString().padStart(2, '0');
+            let seconds = now.getSeconds().toString().padStart(2, '0');
+            
+            // แสดงเวลาใน HTML
+            document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+            
+            // แสดงวันที่
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('date').textContent = now.toLocaleDateString('th-TH', options);
+        }
+
+        // สั่งให้ทำงานทุกๆ 1 วินาที (1000 มิลลิวินาที)
+        setInterval(updateClock, 1000);
+
+        // เรียกใช้งานทันทีที่โหลดหน้าเว็บ
+        updateClock();
+    </script>
+
 </body>
 </html>
