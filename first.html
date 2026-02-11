@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aptos Clock with Fireworks</title>
+    <title>Aptos Clock & Date with Fireworks</title>
     <style>
         body {
             background-color: #ffffff;
@@ -11,43 +11,58 @@
             margin: 0;
             padding: 0;
             font-family: 'Aptos', 'Segoe UI', system-ui, -apple-system, sans-serif;
-            min-height: 200vh;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
 
-        /* นาฬิกาล็อคติดหน้าจอ */
+        /* กล่องนาฬิกาและวันที่ */
         .fixed-clock {
             position: fixed;
             top: 15px;
             right: 15px;
             background-color: rgba(255, 255, 255, 0.9);
             color: #222;
-            padding: 10px 20px;
-            border-radius: 12px;
+            padding: 12px 25px;
+            border-radius: 15px;
             border: 1px solid #e0e0e0;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            z-index: 10000; /* ให้อยู่เหนือพลุ */
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            z-index: 1000; 
             text-align: center;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(8px);
+            min-width: 120px;
         }
 
         #clock {
-            font-size: 1.4rem;
+            font-size: 1.8rem; /* ขยายขนาดนาฬิกาเล็กน้อย */
             font-weight: 600;
             font-variant-numeric: tabular-nums;
+            line-height: 1.1;
         }
 
-        /* Canvas สำหรับพลุ */
+        #date {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #666;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase; /* ทำให้ชื่อเดือนเป็นตัวพิมพ์ใหญ่ดู Minimal */
+        }
+
         #fireworks-canvas {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* ให้คลิกทะลุผ่านได้ */
-            z-index: 9999;
+            pointer-events: none; 
+            z-index: -1; 
         }
 
-        .content { padding: 50px; }
+        .content { 
+            position: relative;
+            padding: 60px 50px; 
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
@@ -56,20 +71,21 @@
 
     <div class="fixed-clock">
         <div id="clock">00:00:00</div>
+        <div id="date">01-JAN-26</div>
     </div>
 
     <div class="content">
         <h1>ยินดีต้อนรับ</h1>
-        <p>นาฬิกาจะจุดพลุฉลองทุกๆ ต้นชั่วโมง (เช่น 12:00, 13:00)</p>
+        <p>นาฬิกาจะจุดพลุฉลองทุกๆ ต้นชั่วโมง</p>
     </div>
 
     <script>
         const canvas = document.getElementById('fireworks-canvas');
         const ctx = canvas.getContext('2d');
         const clockElement = document.getElementById('clock');
+        const dateElement = document.getElementById('date');
         let particles = [];
 
-        // ปรับขนาด Canvas ให้เต็มจอเสมอ
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -77,6 +93,7 @@
         window.addEventListener('resize', resize);
         resize();
 
+        // --- ระบบพลุ ---
         class Particle {
             constructor(x, y, color) {
                 this.x = x;
@@ -88,17 +105,21 @@
                 };
                 this.alpha = 1;
                 this.friction = 0.95;
+                this.gravity = 0.05;
             }
             draw() {
+                ctx.save();
                 ctx.globalAlpha = this.alpha;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
                 ctx.fill();
+                ctx.restore();
             }
             update() {
                 this.velocity.x *= this.friction;
                 this.velocity.y *= this.friction;
+                this.velocity.y += this.gravity;
                 this.x += this.velocity.x;
                 this.y += this.velocity.y;
                 this.alpha -= 0.01;
@@ -107,49 +128,55 @@
 
         function createFirework() {
             const x = Math.random() * canvas.width;
-            const y = Math.random() * (canvas.height * 0.5);
-            const color = `hsl(${Math.random() * 360}, 50%, 50%)`;
-            for (let i = 0; i < 30; i++) {
+            const y = Math.random() * (canvas.height * 0.4) + (canvas.height * 0.1);
+            const color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+            for (let i = 0; i < 40; i++) {
                 particles.push(new Particle(x, y, color));
             }
         }
 
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            particles.forEach((p, i) => {
-                if (p.alpha <= 0) {
-                    particles.splice(i, 1);
-                } else {
-                    p.update();
-                    p.draw();
-                }
-            });
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].alpha <= 0) particles.splice(i, 1);
+            }
             requestAnimationFrame(animate);
         }
         animate();
 
+        // --- ระบบนาฬิกาและวันที่ ---
         function updateClock() {
             const now = new Date();
-            const h = now.getHours();
-            const m = now.getMinutes();
-            const s = now.getSeconds();
             
-            clockElement.textContent = 
-                `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            // อัปเดตนาฬิกา
+            const h = now.getHours().toString().padStart(2, '0');
+            const m = now.getMinutes().toString().padStart(2, '0');
+            const s = now.getSeconds().toString().padStart(2, '0');
+            clockElement.textContent = `${h}:${m}:${s}`;
 
-            // เงื่อนไข: ถ้าเป็นนาทีที่ 0 และวินาทีที่ 0 (ต้นชั่วโมงพอดี)
-            if (m === 0 && s === 0) {
-                for(let i=0; i<5; i++) { // จุดพลุ 5 ลูก
-                    setTimeout(createFirework, i * 300);
-                }
+            // อัปเดตวันที่ format dd-mmm-yy
+            const day = now.getDate().toString().padStart(2, '0');
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const mmm = months[now.getMonth()];
+            const yy = now.getFullYear().toString().slice(-2);
+            dateElement.textContent = `${day}-${mmm}-${yy}`;
+
+            // จุดพลุต้นชั่วโมง
+            if (m === "00" && s === "00") {
+                for(let i=0; i<8; i++) setTimeout(createFirework, i * 400);
             }
         }
 
         setInterval(updateClock, 1000);
         updateClock();
 
-        // ทดสอบ: ถ้าอยากดูพลุเลยตอนนี้โดยไม่ต้องรอต้นชั่วโมง 
-        // ให้ลองพิมพ์ createFirework() ใน Console ของ Browser นะครับ
+        // คลิกเพื่อจุดพลุ
+        window.addEventListener('mousedown', (e) => {
+            const color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+            for (let i = 0; i < 30; i++) particles.push(new Particle(e.clientX, e.clientY, color));
+        });
     </script>
 </body>
 </html>
