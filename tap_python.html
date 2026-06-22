@@ -1,39 +1,137 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <title>Python in Browser</title>
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Jupyter Notebook Projects</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f172a, #1e293b, #334155);
+      color: white;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: auto;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .hero h1 {
+      font-size: 42px;
+      margin-bottom: 12px;
+    }
+
+    .hero p {
+      color: #cbd5e1;
+      font-size: 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      transition: 0.25s ease;
+      text-decoration: none;
+      color: white;
+      display: block;
+    }
+
+    .card:hover {
+      transform: translateY(-8px);
+      background: rgba(255, 255, 255, 0.16);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .icon {
+      font-size: 36px;
+      margin-bottom: 16px;
+    }
+
+    .card h2 {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+
+    .card p {
+      color: #cbd5e1;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: #38bdf8;
+      color: #020617;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 50px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+  </style>
 </head>
+
 <body>
-  <h1>Python บน Web</h1>
+  <div class="container">
+    <section class="hero">
+      <h1>📓 My Jupyter Notebook Projects</h1>
+      <p>รวมโปรเจกต์ Data Science, Python และ Machine Learning ของฉัน</p>
+    </section>
 
-  <textarea id="code" rows="10" cols="50">
-print("Hello from Python!")
-x = [1, 2, 3, 4, 5]
-print(f"Sum = {sum(x)}")
-  </textarea>
-  <br>
-  <button onclick="runCode()">Run Python</button>
-  <pre id="output"></pre>
+    <section class="grid">
+      <a class="card" href="notebooks/project1.html">
+        <div class="icon">📊</div>
+        <h2>Data Analysis Project</h2>
+        <p>วิเคราะห์ข้อมูล พร้อมกราฟและสรุป insight จาก Jupyter Notebook</p>
+        <span class="button">เปิด Notebook</span>
+      </a>
 
-  <script>
-    let pyodide;
-    async function main() {
-      pyodide = await loadPyodide();
-      document.querySelector("button").disabled = false;
-    }
-    async function runCode() {
-      const code = document.getElementById("code").value;
-      try {
-        await pyodide.runPythonAsync(code);
-        document.getElementById("output").textContent =
-          pyodide.runPython("import sys; sys.stdout.getvalue()") || "done";
-      } catch (err) {
-        document.getElementById("output").textContent = "Error: " + err;
-      }
-    }
-    main();
-  </script>
+      <a class="card" href="notebooks/project2.html">
+        <div class="icon">🤖</div>
+        <h2>Machine Learning Model</h2>
+        <p>ตัวอย่างการสร้างโมเดล Machine Learning ด้วย Python และ Scikit-learn</p>
+        <span class="button">เปิด Notebook</span>
+      </a>
+
+      <a class="card" href="notebooks/project3.html">
+        <div class="icon">🐍</div>
+        <h2>Python Practice</h2>
+        <p>รวมแบบฝึกหัด Python และโค้ดตัวอย่างสำหรับฝึกเขียนโปรแกรม</p>
+        <span class="button">เปิด Notebook</span>
+      </a>
+    </section>
+
+    <footer>
+      Made with Jupyter Notebook & GitHub Pages
+    </footer>
+  </div>
 </body>
 </html>
