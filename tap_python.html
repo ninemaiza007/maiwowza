@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Python in Browser</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
+</head>
+<body>
+  <h1>Python บน Web</h1>
+
+  <textarea id="code" rows="10" cols="50">
+print("Hello from Python!")
+x = [1, 2, 3, 4, 5]
+print(f"Sum = {sum(x)}")
+  </textarea>
+  <br>
+  <button onclick="runCode()">Run Python</button>
+  <pre id="output"></pre>
+
+  <script>
+    let pyodide;
+    async function main() {
+      pyodide = await loadPyodide();
+      document.querySelector("button").disabled = false;
+    }
+    async function runCode() {
+      const code = document.getElementById("code").value;
+      try {
+        await pyodide.runPythonAsync(code);
+        document.getElementById("output").textContent =
+          pyodide.runPython("import sys; sys.stdout.getvalue()") || "done";
+      } catch (err) {
+        document.getElementById("output").textContent = "Error: " + err;
+      }
+    }
+    main();
+  </script>
+</body>
+</html>
