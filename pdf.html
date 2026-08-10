@@ -6,6 +6,7 @@
 <title>รวมไฟล์ PDF</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
   --ink:#111619;
@@ -31,7 +32,37 @@ body{
   line-height:1.55;
   -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:1080px;margin:0 auto;padding:32px 20px 64px}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 20px 64px}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:20;
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+}
+.topbar-in{
+  max-width:1080px;margin:0 auto;padding:8px 20px;
+  display:flex;align-items:center;gap:12px;
+}
+.navbtn{
+  font-family:var(--mono);font-size:12px;letter-spacing:.06em;
+  background:transparent;border:1px solid var(--line);color:var(--ink);
+  padding:7px 12px;cursor:pointer;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.navbtn:hover:not(:disabled){background:var(--ink);border-color:var(--ink);color:#fff}
+.navbtn:disabled{opacity:.4;cursor:not-allowed}
+.navbtn:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
+.clock{
+  margin-left:auto;text-align:right;line-height:1.15;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;
+}
+.clock-time{display:block;font-size:17px;letter-spacing:.04em;color:var(--ink)}
+.clock-date{display:block;font-size:10.5px;letter-spacing:.08em;color:var(--steel)}
+@media (max-width:420px){
+  .clock-time{font-size:15px}
+  .navbtn{padding:7px 9px}
+}
 
 /* ---------- masthead ---------- */
 .eyebrow{
@@ -156,6 +187,25 @@ body{
 
 /* ---------- page map (signature) ---------- */
 .panel-box{background:var(--card);border:1px solid var(--line);padding:16px}
+.tabs{display:flex;border:1px solid var(--ink);margin:0 0 16px}
+.tab{
+  flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  background:transparent;border:0;padding:10px 6px;cursor:pointer;color:var(--ink);
+}
+.tab.is-on{background:var(--ink);color:#fff}
+.tab:focus-visible{outline:3px solid var(--signal);outline-offset:-3px}
+.hidden{display:none}
+.sel{
+  width:100%;font-family:var(--mono);font-size:13px;
+  border:1px solid var(--line);padding:8px;background:#fff;color:var(--ink);
+}
+.sel:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+.est{
+  font-family:var(--mono);font-size:11.5px;line-height:1.5;
+  color:var(--steel);margin:10px 0 0;
+  border-left:3px solid var(--line);padding-left:9px;
+}
+.est.warn{color:var(--amber);border-left-color:var(--amber)}
 .ruler{
   position:relative;
   padding-left:36px;
@@ -216,6 +266,16 @@ body{
 </style>
 </head>
 <body>
+<div class="topbar">
+  <div class="topbar-in">
+    <button class="navbtn" id="btnBack" aria-label="ย้อนกลับไปหน้าก่อนหน้า">← ย้อนกลับ</button>
+    <div class="clock" aria-live="off">
+      <span class="clock-time" id="clkTime">--:--:--</span>
+      <span class="clock-date" id="clkDate">—</span>
+    </div>
+  </div>
+</div>
+
 <div class="wrap">
 
   <header class="masthead">
@@ -243,29 +303,85 @@ body{
 
     <aside class="panel">
       <div class="panel-box">
-        <p class="eyebrow">แผนผังหน้าของไฟล์ผลลัพธ์</p>
+        <div class="tabs">
+          <button class="tab is-on" id="tabMerge">รวมเป็น PDF</button>
+          <button class="tab" id="tabPng">แปลงเป็น PNG</button>
+        </div>
+
+        <p class="eyebrow" id="panelLabel">แผนผังหน้าของไฟล์ผลลัพธ์</p>
         <div class="ruler" id="ruler"></div>
         <p class="total" id="total">0 หน้า</p>
 
-        <div class="field">
-          <label for="outname">ชื่อไฟล์ที่บันทึก</label>
-          <input type="text" id="outname" spellcheck="false">
+        <div id="mergeGroup">
+          <div class="field">
+            <label for="outname">ชื่อไฟล์ที่บันทึก</label>
+            <input type="text" id="outname" spellcheck="false">
+          </div>
+
+          <label class="check">
+            <input type="checkbox" id="pageNums">
+            <span>ใส่เลขหน้าที่มุมล่างขวา (รูปแบบ 1 / 34)</span>
+          </label>
+
+          <div class="field">
+            <button class="btn btn-primary" id="btnMerge" disabled>รวมและบันทึก</button>
+          </div>
         </div>
 
-        <label class="check">
-          <input type="checkbox" id="pageNums">
-          <span>ใส่เลขหน้าที่มุมล่างขวา (รูปแบบ 1 / 34)</span>
-        </label>
+        <div id="pngGroup" class="hidden">
+          <div class="field">
+            <label for="dpi">ความละเอียด</label>
+            <select class="sel" id="dpi">
+              <option value="96">96 DPI</option>
+              <option value="150" selected>150 DPI</option>
+              <option value="200">200 DPI</option>
+              <option value="300">300 DPI</option>
+              <option value="400">400 DPI</option>
+              <option value="600">600 DPI</option>
+              <option value="1200">1200 DPI</option>
+              <option value="custom">กำหนดเอง…</option>
+            </select>
+          </div>
 
-        <div class="field">
-          <button class="btn btn-primary" id="btnMerge" disabled>รวมและบันทึก</button>
+          <div class="field hidden" id="dpiCustomWrap">
+            <label for="dpiCustom">DPI ที่ต้องการ (72–1200)</label>
+            <input class="sel" type="number" id="dpiCustom" min="72" max="1200" step="1" value="600">
+          </div>
+
+          <p class="est" id="est"></p>
+
+          <div class="field">
+            <label for="zipname">ชื่อไฟล์ zip</label>
+            <input type="text" id="zipname" spellcheck="false">
+          </div>
+
+          <label class="check">
+            <input type="checkbox" id="whiteBg" checked>
+            <span>พื้นหลังสีขาว (ไม่เอาพื้นโปร่งใส)</span>
+          </label>
+
+          <label class="check">
+            <input type="checkbox" id="splitFiles">
+            <span>บันทึกแยกไฟล์ ไม่ต้องทำ zip (ประหยัดแรมตอนใช้ DPI สูง)</span>
+          </label>
+
+          <div class="field">
+            <button class="btn btn-primary" id="btnPng" disabled>แปลงและบันทึก</button>
+          </div>
         </div>
+
         <p class="status" id="status" role="status"></p>
       </div>
 
-      <p class="hint">
+      <p class="hint" id="hintMerge">
         ช่องช่วงหน้ารับค่าแบบ <code>1-3,7,10-</code> — เว้นว่างไว้คือเอาทั้งไฟล์<br>
         ไฟล์ที่ใส่รหัสผ่านเปิดอ่านอาจรวมไม่ได้ ให้ปลดรหัสก่อน
+      </p>
+      <p class="hint hidden" id="hintPng">
+        ตั้งชื่อรูปเป็น <code>ชื่อไฟล์-p001.png</code> ตามหน้าจริงในไฟล์ต้นทาง<br>
+        ได้รูปเดียวจะบันทึกเป็น .png ตรงๆ มากกว่าหนึ่งรูปจะรวมเป็น .zip<br>
+        ถ้าไฟล์ต้นทางเป็นภาพสแกน 200–300 DPI การเรนเดอร์ที่ 1200 DPI ไม่ได้เพิ่มรายละเอียด
+        แค่ขยายพิกเซลเดิม — DPI สูงคุ้มเฉพาะ PDF ที่เป็นเวกเตอร์ (ตัวอักษร เส้นแบบ)
       </p>
     </aside>
   </div>
@@ -286,12 +402,27 @@ let dragId = null;
 const $ = (id) => document.getElementById(id);
 const dropzone = $("dropzone"), picker = $("picker"), cardsEl = $("cards");
 const rulerEl = $("ruler"), totalEl = $("total"), countEl = $("count");
-const statusEl = $("status"), outname = $("outname");
+const statusEl = $("status"), outname = $("outname"), zipname = $("zipname");
 const btnMerge = $("btnMerge"), btnSort = $("btnSort"), btnClear = $("btnClear");
+const btnPng = $("btnPng"), panelLabel = $("panelLabel");
+
+let mode = "merge";
 
 const pad = (n) => String(n).padStart(2, "0");
 const today = new Date();
-outname.value = `merged-${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}.pdf`;
+const stamp = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+outname.value = `merged-${stamp}.pdf`;
+zipname.value = `pages-${stamp}.zip`;
+
+const safeName = (s) => s.replace(/[\\/:*?"<>|]/g, "_");
+
+function download(blob, fname) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
 
 function say(msg, kind) {
   statusEl.textContent = msg || "";
@@ -376,6 +507,7 @@ async function makeThumb(item) {
     const doc = await pdfjsLib.getDocument({ data: new Uint8Array(item.bytes) }).promise;
     const page = await doc.getPage(1);
     const base = page.getViewport({ scale: 1 });
+    item.ptW = base.width; item.ptH = base.height;
     const scale = Math.min(108 / base.width, 144 / base.height);
     const vp = page.getViewport({ scale });
     const canvas = document.createElement("canvas");
@@ -500,13 +632,31 @@ function refreshMeta() {
   const bad = usable.some((x) => !parseRange(x.range, x.pageCount).ok);
 
   countEl.textContent = items.length
-    ? `${items.length} ไฟล์ · ${pages} หน้าที่จะรวม`
+    ? `${items.length} ไฟล์ · ${pages} หน้าที่เลือกไว้`
     : "ยังไม่มีไฟล์";
-  totalEl.textContent = `${pages} หน้า จาก ${usable.length} ไฟล์`;
+  totalEl.textContent = mode === "png"
+    ? `${pages} รูป จาก ${usable.length} ไฟล์`
+    : `${pages} หน้า จาก ${usable.length} ไฟล์`;
 
   btnSort.disabled = items.length < 2;
   btnClear.disabled = items.length === 0;
   btnMerge.disabled = pages === 0 || bad;
+  btnPng.disabled = pages === 0 || bad;
+  updateEstimate();
+}
+
+function setMode(next) {
+  mode = next;
+  const png = mode === "png";
+  $("tabMerge").classList.toggle("is-on", !png);
+  $("tabPng").classList.toggle("is-on", png);
+  $("mergeGroup").classList.toggle("hidden", png);
+  $("pngGroup").classList.toggle("hidden", !png);
+  $("hintMerge").classList.toggle("hidden", png);
+  $("hintPng").classList.toggle("hidden", !png);
+  panelLabel.textContent = png ? "หน้าที่จะแปลงเป็นรูป" : "แผนผังหน้าของไฟล์ผลลัพธ์";
+  say("");
+  refreshMeta();
 }
 
 function drawRuler() {
@@ -580,18 +730,166 @@ async function merge() {
     out.setCreationDate(new Date());
 
     const bytes = await out.save();
-    let fname = (outname.value || "merged.pdf").trim().replace(/[\\/:*?"<>|]/g, "_");
+    let fname = safeName((outname.value || "merged.pdf").trim());
     if (!/\.pdf$/i.test(fname)) fname += ".pdf";
 
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-    const a = document.createElement("a");
-    a.href = url; a.download = fname;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-
+    download(new Blob([bytes], { type: "application/pdf" }), fname);
     say(`บันทึกแล้ว — ${pages.length} หน้า (${humanSize(bytes.length)})`, "ok");
   } catch (e) {
     say("รวมไฟล์ไม่สำเร็จ: " + (e.message || e), "err");
+  }
+  refreshMeta();
+}
+
+/* ---------- pdf → png ---------- */
+// เพดานของ canvas ในเบราว์เซอร์: ด้านละไม่เกิน ~32767 px และพื้นที่รวมไม่เกิน ~250 ล้าน px
+const MAX_SIDE = 32767, MAX_AREA = 2.4e8;
+
+function fitScale(wPt, hPt, scale) {
+  let s = scale;
+  if (wPt * s > MAX_SIDE || hPt * s > MAX_SIDE) {
+    s = Math.min((MAX_SIDE / wPt), (MAX_SIDE / hPt));
+  }
+  const area = wPt * s * hPt * s;
+  if (area > MAX_AREA) s *= Math.sqrt(MAX_AREA / area);
+  return s;
+}
+
+function currentDpi() {
+  const v = $("dpi").value;
+  if (v !== "custom") return +v;
+  const n = Math.round(+$("dpiCustom").value || 0);
+  return Math.min(1200, Math.max(72, n));
+}
+
+function updateEstimate() {
+  const el = $("est");
+  const usable = items.filter((x) => !x.error && selectedCount(x) > 0);
+  if (!usable.length) { el.textContent = ""; el.className = "est"; return; }
+
+  const dpi = currentDpi();
+  let wPt = 0, hPt = 0, known = false;
+  usable.forEach((x) => {
+    if (x.ptW && x.ptH) { known = true; wPt = Math.max(wPt, x.ptW); hPt = Math.max(hPt, x.ptH); }
+  });
+  if (!known) { wPt = 595.28; hPt = 841.89; } // A4
+
+  const want = dpi / 72;
+  const got = fitScale(wPt, hPt, want);
+  const pw = Math.ceil(wPt * got), ph = Math.ceil(hPt * got);
+  const ramMB = (pw * ph * 4) / 1048576;
+  const pages = usable.reduce((s, x) => s + selectedCount(x), 0);
+
+  let txt = `หน้าใหญ่สุด → ${pw} × ${ph} px · แรมราว ${ramMB.toFixed(0)} MB/หน้า`;
+  if (!known) txt += " (ประมาณจากขนาด A4)";
+  let warn = false;
+  if (got < want - 0.001) {
+    txt += `\nเกินเพดาน canvas ของเบราว์เซอร์ จะลดให้เหลือราว ${Math.round(dpi * got / want)} DPI`;
+    warn = true;
+  }
+  if (ramMB > 300 || (ramMB * pages > 1500 && !$("splitFiles").checked)) {
+    txt += `\nรวม ${pages} หน้าแบบนี้เสี่ยงแท็บค้าง — ติ๊ก "บันทึกแยกไฟล์" หรือลด DPI`;
+    warn = true;
+  }
+  el.textContent = txt;
+  el.className = "est" + (warn ? " warn" : "");
+  el.style.whiteSpace = "pre-line";
+}
+
+async function exportPng() {
+  if (!window.pdfjsLib) {
+    say("โหลด pdf.js ไม่สำเร็จ — ต้องต่อเน็ตตอนเปิดหน้านี้ครั้งแรก", "err");
+    return;
+  }
+  const jobs = [];
+  for (const item of items) {
+    if (item.error) continue;
+    const r = parseRange(item.range, item.pageCount);
+    if (!r.ok) continue;
+    r.idx.forEach((i) => jobs.push({ item, page: i + 1 }));
+  }
+  if (!jobs.length) return;
+
+  const dpi = currentDpi();
+  const scale = dpi / 72;
+  const white = $("whiteBg").checked;
+  const split = $("splitFiles").checked || !window.JSZip;
+
+  btnPng.disabled = true;
+  btnMerge.disabled = true;
+  const docs = new Map();
+  const outFiles = [];
+  let capped = 0, saved = 0;
+
+  try {
+    for (let n = 0; n < jobs.length; n++) {
+      const job = jobs[n];
+      say(`กำลังแปลง ${n + 1}/${jobs.length} — ${job.item.name} หน้า ${job.page}`);
+      await new Promise((r) => setTimeout(r, 0));
+
+      let doc = docs.get(job.item.id);
+      if (!doc) {
+        doc = await pdfjsLib.getDocument({ data: new Uint8Array(job.item.bytes) }).promise;
+        docs.set(job.item.id, doc);
+      }
+      const page = await doc.getPage(job.page);
+
+      const base = page.getViewport({ scale: 1 });
+      const s = fitScale(base.width, base.height, scale);
+      if (s < scale - 0.001) capped++;
+      const vp = page.getViewport({ scale: s });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(vp.width);
+      canvas.height = Math.ceil(vp.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("เบราว์เซอร์จัดสรร canvas ขนาดนี้ไม่ได้ ลองลด DPI");
+      await page.render({
+        canvasContext: ctx,
+        viewport: vp,
+        background: white ? "#ffffff" : "rgba(0,0,0,0)",
+      }).promise;
+
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      canvas.width = canvas.height = 0;
+      if (!blob) throw new Error("สร้างรูปไม่สำเร็จ — หน้าใหญ่เกินเพดานเบราว์เซอร์ ลองลด DPI");
+
+      const stem = safeName(job.item.name.replace(/\.pdf$/i, ""));
+      const fname = `${stem}-p${String(job.page).padStart(3, "0")}.png`;
+
+      if (split) {
+        download(blob, fname);   // ปล่อยแรมทันทีทีละไฟล์
+        saved++;
+        await new Promise((r) => setTimeout(r, 300));
+      } else {
+        outFiles.push({ blob, fname });
+      }
+    }
+
+    docs.forEach((d) => d.destroy());
+    docs.clear();
+
+    const capNote = capped ? ` · ลด DPI ให้ ${capped} หน้าเพราะเกินเพดาน canvas` : "";
+
+    if (split) {
+      say(`บันทึกแล้ว ${saved} รูป แยกไฟล์${capNote}`, "ok");
+    } else if (outFiles.length === 1) {
+      download(outFiles[0].blob, outFiles[0].fname);
+      say(`บันทึกแล้ว — ${outFiles[0].fname} (${humanSize(outFiles[0].blob.size)})${capNote}`, "ok");
+    } else {
+      say("กำลังรวมเป็นไฟล์ zip…");
+      await new Promise((r) => setTimeout(r, 0));
+      const zip = new JSZip();
+      outFiles.forEach((f) => zip.file(f.fname, f.blob));
+      const blob = await zip.generateAsync({ type: "blob", compression: "STORE" });
+      let zn = safeName((zipname.value || "pages.zip").trim());
+      if (!/\.zip$/i.test(zn)) zn += ".zip";
+      download(blob, zn);
+      say(`บันทึกแล้ว — ${outFiles.length} รูป ใน ${zn} (${humanSize(blob.size)})${capNote}`, "ok");
+    }
+  } catch (e) {
+    docs.forEach((d) => { try { d.destroy(); } catch (_) {} });
+    say("แปลงไม่สำเร็จ: " + (e.message || e), "err");
   }
   refreshMeta();
 }
@@ -629,7 +927,39 @@ btnSort.onclick = () => {
 };
 btnClear.onclick = () => { items.length = 0; render(); say(""); };
 btnMerge.onclick = merge;
+btnPng.onclick = exportPng;
+$("tabMerge").onclick = () => setMode("merge");
+$("tabPng").onclick = () => setMode("png");
 $("pageNums").onchange = () => say("");
+$("dpi").onchange = () => {
+  $("dpiCustomWrap").classList.toggle("hidden", $("dpi").value !== "custom");
+  say(""); updateEstimate();
+};
+$("dpiCustom").oninput = updateEstimate;
+$("splitFiles").onchange = updateEstimate;
+$("zipname").oninput = () => say("");
+
+/* ---------- top bar: back + clock ---------- */
+const btnBack = $("btnBack");
+if (history.length <= 1) {
+  btnBack.disabled = true;
+  btnBack.title = "ไม่มีหน้าก่อนหน้าในแท็บนี้";
+} else {
+  btnBack.onclick = () => history.back();
+}
+
+const clkTime = $("clkTime"), clkDate = $("clkDate");
+function tick() {
+  const now = new Date();
+  clkTime.textContent = now.toLocaleTimeString("th-TH", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  });
+  clkDate.textContent = now.toLocaleDateString("th-TH", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric",
+  });
+  setTimeout(tick, 1000 - (Date.now() % 1000) + 5);  // เกาะขอบวินาที กันเวลาเลื่อน
+}
+tick();
 
 render();
 </script>
