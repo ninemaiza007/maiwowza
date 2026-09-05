@@ -8,6 +8,7 @@
   :root {
     --bg:#000; --fg:#ccc; --amber:#f4a949; --orange:#e07b39;
     --blue:#5b8fc7; --dim:#888; --line:#333; --field:#111; --white:#e8e8e8;
+    --sun:#ffd24a; --thunder:#ffe14a;
   }
   * { box-sizing:border-box; margin:0; padding:0; }
   body {
@@ -38,13 +39,31 @@
   .mode-row { display:flex; gap:8px; width:100%; }
   .hidden { display:none !important; }
   #out { overflow-x:auto; padding:4px 0; }
-  pre { font-family:inherit; font-size:13px; line-height:1.25; white-space:pre; }
+  pre { font-family:inherit; font-size:13px; line-height:1.25; white-space:pre; margin:0; }
   .msg { color:var(--dim); padding:30px 4px; font-size:14px; }
   .msg.err { color:#d9705f; }
   a { color:var(--amber); }
   .foot { color:var(--dim); font-size:12px; margin-top:18px; border-top:1px solid var(--line); padding-top:12px; }
-  .c-amber { color:var(--amber); } .c-orange { color:var(--orange); }
-  .c-blue { color:var(--blue); } .c-dim { color:var(--dim); } .c-white { color:var(--white); }
+  .c-amber{color:var(--amber);} .c-orange{color:var(--orange);}
+  .c-blue{color:var(--blue);} .c-dim{color:var(--dim);} .c-white{color:var(--white);}
+  .art { display:inline-block; }
+  .art .cloud { color:var(--white); }
+  .art .drop  { color:var(--blue); }
+  .art .sun   { color:var(--sun); }
+  .art .bolt  { color:var(--thunder); }
+  .art .flake { color:#dff2ff; }
+
+  /* animations */
+  @keyframes fall { 0%{transform:translateY(-2px);opacity:0;} 20%{opacity:1;} 100%{transform:translateY(10px);opacity:0;} }
+  @keyframes drift { 0%,100%{transform:translateX(0);} 50%{transform:translateX(3px);} }
+  @keyframes spin { 0%{opacity:.4;} 50%{opacity:1;} 100%{opacity:.4;} }
+  @keyframes flash { 0%,92%,100%{opacity:.15;} 93%,97%{opacity:1;} }
+  @keyframes snowfall { 0%{transform:translateY(-2px);opacity:0;} 30%{opacity:1;} 100%{transform:translateY(12px);opacity:0;} }
+  .anim-cloud { display:inline-block; animation:drift 4s ease-in-out infinite; }
+  .anim-drop  { display:inline-block; animation:fall 1.1s linear infinite; }
+  .anim-sun   { display:inline-block; animation:spin 2.2s ease-in-out infinite; }
+  .anim-bolt  { display:inline-block; animation:flash 3s steps(1) infinite; }
+  .anim-flake { display:inline-block; animation:snowfall 2.2s linear infinite; }
 </style>
 </head>
 <body>
@@ -68,7 +87,7 @@
     <div class="msg">พิมพ์ชื่อเมืองหรือพิกัด แล้วกด "ดูอากาศ" — หรือกด 📍 เพื่อใช้ตำแหน่งอุปกรณ์</div>
   </div>
 
-  <div class="foot">ข้อมูลจาก <a href="https://wttr.in" target="_blank" rel="noopener">wttr.in</a> (JSON API)</div>
+  <div class="foot">ข้อมูลจาก <a href="https://wttr.in" target="_blank" rel="noopener">wttr.in</a></div>
 
 <script>
 const out = document.getElementById('out');
@@ -79,7 +98,7 @@ const latIn = document.getElementById('lat');
 const lonIn = document.getElementById('lon');
 const bCity = document.getElementById('mCity');
 const bGeo = document.getElementById('mGeo');
-let mode = 'city';
+let mode='city';
 
 function setMode(m){
   mode=m;
@@ -91,141 +110,183 @@ function setMode(m){
 bCity.onclick=()=>setMode('city');
 bGeo.onclick=()=>setMode('geo');
 function msg(t,e){ out.innerHTML='<div class="msg'+(e?' err':'')+'">'+t+'</div>'; }
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function pad(s,n){ s=String(s); return s+' '.repeat(Math.max(0,n-s.length)); }
 
-// ---- ASCII art per weather condition (wego-style) ----
-const ART = {
-  sunny:      ['    \\   /    ','     .-.     ','  ― (   ) ―  ','     `-\u2019     ','    /   \\    '],
-  partly:     ['   \\  /      ',' _ /\"\".-.    ','   \\_(   ).  ','   /(___(__) ','             '],
-  cloudy:     ['             ','     .--.    ','  .-(    ).  ',' (___.__)__) ','             '],
-  overcast:   ['             ','     .--.    ','  .-(    ).  ',' (___.__)__) ','             '],
-  fog:        ['             ',' _ - _ - _ - ','  _ - _ - _  ',' _ - _ - _ - ','             '],
-  lightrain:  [' _`/\"\".-.    ','  ,\\_(   ).  ','   /(___(__) ','     \u2018 \u2018 \u2018 \u2018 ','    \u2018 \u2018 \u2018 \u2018  '],
-  rain:       [' _`/\"\".-.    ','  ,\\_(   ).  ','   /(___(__) ','   \u2018\u2018\u2018\u2018\u2018\u2018\u2018\u2018 ','   \u2018\u2018\u2018\u2018\u2018\u2018\u2018\u2018 '],
-  thunder:    [' _`/\"\".-.    ','  ,\\_(   ).  ','   /(___(__) ','    \u26a1\u2018\u2018\u26a1\u2018\u2018 ','    \u2018\u2018\u26a1\u2018\u2018\u26a1  '],
-  snow:       [' _`/\"\".-.    ','  ,\\_(   ).  ','   /(___(__) ','    *  *  *  ','   *  *  *   '],
-  unknown:    ['    .-.      ','     __)     ','    (        ','     `-\u2019     ','    \u2022        ']
-};
-function pickArt(code, desc){
-  code = parseInt(code);
-  const sunny=[113], partly=[116], cloudy=[119], overcast=[122];
-  const fog=[143,248,260];
-  const thunder=[200,386,389,392,395];
-  const snow=[179,227,230,323,326,329,332,335,338,368,371,374,377];
-  const light=[176,263,266,281,284,293,296,311,317,350,353,362,365];
-  if(sunny.includes(code)) return ART.sunny;
-  if(partly.includes(code)) return ART.partly;
-  if(cloudy.includes(code)) return ART.cloudy;
-  if(overcast.includes(code)) return ART.overcast;
-  if(fog.includes(code)) return ART.fog;
-  if(thunder.includes(code)) return ART.thunder;
-  if(snow.includes(code)) return ART.snow;
-  if(light.includes(code)) return ART.lightrain;
-  if(!isNaN(code)) return ART.rain;
-  return ART.unknown;
+// Build an animated art block (5 lines) as HTML. Each art is an array of 5 HTML strings.
+// We wrap animated glyphs in spans with staggered delays.
+function drop(delay){ return '<span class="anim-drop drop" style="animation-delay:'+delay+'s">\u2018</span>'; }
+function flake(delay){ return '<span class="anim-flake flake" style="animation-delay:'+delay+'s">*</span>'; }
+
+function artSunny(){
+  const s='<span class="anim-sun sun">';
+  return [
+    '    '+s+'\\</span>   '+s+'/</span>    ',
+    '     <span class="sun">.-.</span>     ',
+    '  '+s+'\u2015</span> <span class="sun">(   )</span> '+s+'\u2015</span>  ',
+    '     <span class="sun">`-\u2019</span>     ',
+    '    '+s+'/</span>   '+s+'\\</span>    '
+  ];
+}
+function artPartly(){
+  const c='<span class="anim-cloud cloud">';
+  return [
+    '   <span class="sun">\\</span>  <span class="sun">/</span>      ',
+    ' <span class="sun">_ /\"\"</span>'+c+'.-.</span>    ',
+    '   '+c+'\\_(   ).</span>  ',
+    '   '+c+'/(___(__)</span> ',
+    '             '
+  ];
+}
+function artCloudy(){
+  const c='<span class="anim-cloud cloud">';
+  return [
+    '             ',
+    '     '+c+'.--.</span>    ',
+    '  '+c+'.-(    ).</span>  ',
+    ' '+c+'(___.__)__)</span> ',
+    '             '
+  ];
+}
+function artFog(){
+  const f='<span class="anim-cloud dim">';
+  return ['             ',' '+f+'_ - _ - _ -</span> ','  '+f+'_ - _ - _</span>  ',' '+f+'_ - _ - _ -</span> ','             '];
+}
+function artRain(light){
+  const c='<span class="cloud">';
+  const r1 = light ? '     '+drop(0)+' '+drop(.4)+' '+drop(.2)+' '+drop(.6)+' '
+                   : '   '+drop(0)+drop(.2)+drop(.4)+drop(.1)+drop(.3)+drop(.5)+drop(.15)+drop(.35)+' ';
+  const r2 = light ? '    '+drop(.5)+' '+drop(.1)+' '+drop(.7)+' '+drop(.3)+'  '
+                   : '   '+drop(.3)+drop(.5)+drop(.1)+drop(.6)+drop(.2)+drop(.45)+drop(.05)+drop(.55)+' ';
+  return [
+    ' <span class="sun">_`/\"\"</span>'+c+'.-.</span>    ',
+    '   '+c+',\\_(   ).</span>  ',
+    '   '+c+'/(___(__)</span> ',
+    r1, r2
+  ];
+}
+function artThunder(){
+  const c='<span class="cloud">';
+  const b='<span class="anim-bolt bolt">\u26a1</span>';
+  return [
+    ' <span class="sun">_`/\"\"</span>'+c+'.-.</span>    ',
+    '   '+c+',\\_(   ).</span>  ',
+    '   '+c+'/(___(__)</span> ',
+    '    '+b+drop(.2)+drop(.4)+b+drop(.1)+drop(.3)+' ',
+    '    '+drop(.5)+drop(.1)+b+drop(.6)+drop(.2)+b+'  '
+  ];
+}
+function artSnow(){
+  const c='<span class="cloud">';
+  return [
+    ' <span class="sun">_`/\"\"</span>'+c+'.-.</span>    ',
+    '   '+c+',\\_(   ).</span>  ',
+    '   '+c+'/(___(__)</span> ',
+    '    '+flake(0)+'  '+flake(.6)+'  '+flake(.3)+'  ',
+    '   '+flake(.4)+'  '+flake(.1)+'  '+flake(.7)+'   '
+  ];
+}
+function artUnknown(){
+  return ['    .-.      ','     __)     ','    (        ','     `-\u2019     ','    \u2022        '];
 }
 
-function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function pad(s, n){ s=String(s); return s + ' '.repeat(Math.max(0, n-s.length)); }
-function padL(s, n){ s=String(s); return ' '.repeat(Math.max(0, n-s.length)) + s; }
+function pickArt(code){
+  code=parseInt(code);
+  if(code===113) return artSunny();
+  if(code===116) return artPartly();
+  if(code===119||code===122) return artCloudy();
+  if([143,248,260].includes(code)) return artFog();
+  if([200,386,389,392,395].includes(code)) return artThunder();
+  if([179,227,230,323,326,329,332,335,338,368,371,374,377].includes(code)) return artSnow();
+  if([176,263,266,281,284,293,296,311,317,350,353,362,365].includes(code)) return artRain(true);
+  if(!isNaN(code)) return artRain(false);
+  return artUnknown();
+}
 
-// wind arrow from degrees
 function windArrow(deg){
   const a=['\u2193','\u2199','\u2190','\u2196','\u2191','\u2197','\u2192','\u2198'];
   return a[Math.round(((+deg)%360)/45)%8];
 }
-
 function desc_th(node){
-  const th = node.lang_th && node.lang_th[0] && node.lang_th[0].value;
-  return th || (node.weatherDesc && node.weatherDesc[0] && node.weatherDesc[0].value) || '';
+  const th=node.lang_th&&node.lang_th[0]&&node.lang_th[0].value;
+  return th||(node.weatherDesc&&node.weatherDesc[0]&&node.weatherDesc[0].value)||'';
 }
 
-function line(art, i, right){
-  return '<span class="c-white">'+esc(art[i])+'</span>'+(right||'');
-}
-
-function render(data, label){
-  const cur = data.current_condition[0];
-  const area = data.nearest_area && data.nearest_area[0];
-  let place = label;
+function render(data,label){
+  const cur=data.current_condition[0];
+  const area=data.nearest_area&&data.nearest_area[0];
+  let place=label;
   if(area){
-    const name = area.areaName[0].value;
-    const country = area.country[0] && area.country[0].value;
-    place = label || [name, country].filter(Boolean).join(', ');
+    const name=area.areaName[0].value;
+    const country=area.country[0]&&area.country[0].value;
+    place=label||[name,country].filter(Boolean).join(', ');
   }
-  place = place || 'your location';
+  place=place||'your location';
 
-  const art = pickArt(cur.weatherCode, desc_th(cur));
-  const d = desc_th(cur);
-  const tC = cur.temp_C, feels = cur.FeelsLikeC;
-  const wind = windArrow(cur.winddirDegree) + ' ' + cur.windspeedKmph + ' km/h';
-  const vis = cur.visibility + ' km';
-  const precip = cur.precipMM + ' mm';
+  const art=pickArt(cur.weatherCode);
+  const d=desc_th(cur);
+  const wind=windArrow(cur.winddirDegree)+' '+cur.windspeedKmph+' km/h';
 
-  // header block (current) — mimic wttr.in layout
-  let h = '';
-  h += 'Weather report: <span class="c-white">'+esc(place)+'</span>\n\n';
-  const rights = [
+  let html='';
+  html+='Weather report: <span class="c-white">'+esc(place)+'</span>\n\n';
+  const rights=[
     '<span class="c-white">'+esc(d)+'</span>',
-    '<span class="c-orange">+'+esc(tC)+'</span>(<span class="c-orange">'+esc(feels)+'</span>) \u00b0C',
+    '<span class="c-orange">+'+esc(cur.temp_C)+'</span>(<span class="c-orange">'+esc(cur.FeelsLikeC)+'</span>) \u00b0C',
     '<span class="c-amber">'+esc(wind)+'</span>',
-    esc(vis),
-    esc(precip)
+    esc(cur.visibility+' km'),
+    esc(cur.precipMM+' mm')
   ];
   for(let i=0;i<5;i++){
-    h += line(art, i, '  ' + (rights[i]||'')) + '\n';
+    html+='<span class="art">'+art[i]+'</span>  '+(rights[i]||'')+'\n';
   }
 
-  // 3-day forecast table
-  let f = '\n';
-  const cols = ['Morning','Noon','Evening','Night'];
-  const idx = [1,4,6,7]; // hourly indices approx
+  // 3-day forecast
+  const cols=['Morning','Noon','Evening','Night'];
+  const idx=[1,4,6,7];
   data.weather.slice(0,3).forEach(day=>{
-    const dt = new Date(day.date+'T00:00:00');
-    const dname = day.date;
-    f += '\n<span class="c-amber">\u250c\u2500 '+esc(dname)+' \u2500\u2510</span>\n';
-    // build 4 columns of compact info
-    let rowDesc='', rowTemp='', rowWind='', rowRain='';
+    html+='\n<span class="c-amber">\u250c\u2500 '+esc(day.date)+' \u2500\u2510</span>\n';
+    let rDesc='',rTemp='',rWind='',rRain='';
     idx.forEach(hi=>{
-      const h2 = day.hourly[Math.min(hi, day.hourly.length-1)];
-      const dd = (h2.lang_th && h2.lang_th[0] && h2.lang_th[0].value) || h2.weatherDesc[0].value;
-      rowDesc += pad(dd.slice(0,13), 15);
-      rowTemp += pad('+'+h2.tempC+'\u00b0C', 15);
-      rowWind += pad(windArrow(h2.winddirDegree)+' '+h2.windspeedKmph+'km/h', 15);
-      rowRain += pad('\ud83d\udca7 '+h2.chanceofrain+'%', 15);
+      const h=day.hourly[Math.min(hi,day.hourly.length-1)];
+      const dd=(h.lang_th&&h.lang_th[0]&&h.lang_th[0].value)||h.weatherDesc[0].value;
+      rDesc+=pad(dd.slice(0,13),15);
+      rTemp+=pad('+'+h.tempC+'\u00b0C',15);
+      rWind+=pad(windArrow(h.winddirDegree)+' '+h.windspeedKmph+'km/h',15);
+      rRain+=pad('\ud83d\udca7 '+h.chanceofrain+'%',15);
     });
-    f += '<span class="c-dim">'+esc(pad('',1))+cols.map(c=>pad(c,15)).join('')+'</span>\n';
-    f += '<span class="c-white">'+esc(rowDesc)+'</span>\n';
-    f += '<span class="c-orange">'+esc(rowTemp)+'</span>\n';
-    f += '<span class="c-amber">'+esc(rowWind)+'</span>\n';
-    f += '<span class="c-blue">'+esc(rowRain)+'</span>\n';
+    html+='<span class="c-dim">'+esc(' '+cols.map(c=>pad(c,15)).join(''))+'</span>\n';
+    html+='<span class="c-white">'+esc(rDesc)+'</span>\n';
+    html+='<span class="c-orange">'+esc(rTemp)+'</span>\n';
+    html+='<span class="c-amber">'+esc(rWind)+'</span>\n';
+    html+='<span class="c-blue">'+esc(rRain)+'</span>\n';
   });
 
-  out.innerHTML = '<pre>'+h+f+'</pre>';
+  out.innerHTML='<pre>'+html+'</pre>';
 }
 
-async function load(query, label){
+async function load(query,label){
   msg('กำลังโหลด '+(label||query)+' \u2026');
   try{
-    const url = 'https://wttr.in/'+encodeURIComponent(query)+'?format=j1&lang=th';
-    const res = await fetch(url);
+    const url='https://wttr.in/'+encodeURIComponent(query)+'?format=j1&lang=th';
+    const res=await fetch(url);
     if(!res.ok) throw new Error('ไม่พบสถานที่ (HTTP '+res.status+')');
-    const data = await res.json();
-    render(data, label);
+    const data=await res.json();
+    render(data,label);
   }catch(e){
     msg('โหลดไม่สำเร็จ: '+e.message+' \u2014 ลองตรวจชื่อเมือง/พิกัดแล้วลองใหม่', true);
   }
 }
 
-document.getElementById('go').onclick = run;
-cityIn.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
-lonIn.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
-latIn.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
+document.getElementById('go').onclick=run;
+cityIn.addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
+lonIn.addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
+latIn.addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
 
 function run(){
   if(mode==='city'){
-    const c = cityIn.value.trim();
+    const c=cityIn.value.trim();
     if(!c) return msg('กรุณาพิมพ์ชื่อเมือง', true);
-    load(c, null);
+    load(c,null);
   }else{
     const la=latIn.value.trim(), lo=lonIn.value.trim();
     if(!la||!lo) return msg('กรุณาใส่ทั้ง latitude และ longitude', true);
@@ -233,7 +294,7 @@ function run(){
   }
 }
 
-document.getElementById('mLoc').onclick = ()=>{
+document.getElementById('mLoc').onclick=()=>{
   if(!navigator.geolocation) return msg('อุปกรณ์ไม่รองรับการระบุตำแหน่ง', true);
   msg('กำลังขอตำแหน่งจากอุปกรณ์ (อนุญาตในหน้าต่างที่เด้งขึ้นมา) \u2026');
   navigator.geolocation.getCurrentPosition(
@@ -241,7 +302,7 @@ document.getElementById('mLoc').onclick = ()=>{
       const la=pos.coords.latitude.toFixed(4);
       const lo=pos.coords.longitude.toFixed(4);
       setMode('geo'); latIn.value=la; lonIn.value=lo;
-      load(la+','+lo, 'ตำแหน่งของคุณ');
+      load(la+','+lo,'ตำแหน่งของคุณ');
     },
     ()=> msg('ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง \u2014 พิมพ์ชื่อเมืองหรือพิกัดเองได้', true)
   );
