@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>wttr.in — weather</title>
+<title>Weather</title>
 <style>
   :root {
     --bg:#000; --fg:#ccc; --amber:#f4a949; --orange:#e07b39;
@@ -55,11 +55,13 @@
 
   /* animations */
   @keyframes fall { 0%{transform:translateY(-2px);opacity:0;} 20%{opacity:1;} 100%{transform:translateY(10px);opacity:0;} }
-  @keyframes drift { 0%,100%{transform:translateX(0);} 50%{transform:translateX(3px);} }
+  @keyframes drift { 0%,100%{transform:translateX(0);} 50%{transform:translateX(5px);} }
+  @keyframes fogdrift { 0%{transform:translateX(-3px);opacity:.5;} 50%{transform:translateX(3px);opacity:1;} 100%{transform:translateX(-3px);opacity:.5;} }
   @keyframes spin { 0%{opacity:.4;} 50%{opacity:1;} 100%{opacity:.4;} }
   @keyframes flash { 0%,92%,100%{opacity:.15;} 93%,97%{opacity:1;} }
   @keyframes snowfall { 0%{transform:translateY(-2px);opacity:0;} 30%{opacity:1;} 100%{transform:translateY(12px);opacity:0;} }
   .anim-cloud { display:inline-block; animation:drift 4s ease-in-out infinite; }
+  .anim-fog   { display:inline-block; animation:fogdrift 3s ease-in-out infinite; }
   .anim-drop  { display:inline-block; animation:fall 1.1s linear infinite; }
   .anim-sun   { display:inline-block; animation:spin 2.2s ease-in-out infinite; }
   .anim-bolt  { display:inline-block; animation:flash 3s steps(1) infinite; }
@@ -86,8 +88,6 @@
   <div id="out">
     <div class="msg">พิมพ์ชื่อเมืองหรือพิกัด แล้วกด "ดูอากาศ" — หรือกด 📍 เพื่อใช้ตำแหน่งอุปกรณ์</div>
   </div>
-
-  <div class="foot">ข้อมูลจาก <a href="https://wttr.in" target="_blank" rel="noopener">wttr.in</a></div>
 
 <script>
 const out = document.getElementById('out');
@@ -149,8 +149,10 @@ function artCloudy(){
   ];
 }
 function artFog(){
-  const f='<span class="anim-cloud dim">';
-  return ['             ',' '+f+'_ - _ - _ -</span> ','  '+f+'_ - _ - _</span>  ',' '+f+'_ - _ - _ -</span> ','             '];
+  const f1='<span class="anim-fog dim" style="animation-delay:0s">';
+  const f2='<span class="anim-fog dim" style="animation-delay:.6s">';
+  const f3='<span class="anim-fog dim" style="animation-delay:1.2s">';
+  return ['             ',' '+f1+'_ - _ - _ -</span> ','  '+f2+'_ - _ - _</span>  ',' '+f3+'_ - _ - _ -</span> ','             '];
 }
 function artRain(light){
   const c='<span class="cloud">';
@@ -240,25 +242,33 @@ function render(data,label){
     html+='<span class="art">'+art[i]+'</span>  '+(rights[i]||'')+'\n';
   }
 
-  // 3-day forecast
+  // 3-day forecast with animated mini-art columns
   const cols=['Morning','Noon','Evening','Night'];
   const idx=[1,4,6,7];
+  const COLW=20;
+  const padArtLine = (s)=>{
+    // pad the *visible* width of an art line (13 chars) into COLW; art HTML already ~13 wide
+    return '<span class="art">'+s+'</span>'+' '.repeat(COLW-13);
+  };
   data.weather.slice(0,3).forEach(day=>{
-    html+='\n<span class="c-amber">\u250c\u2500 '+esc(day.date)+' \u2500\u2510</span>\n';
-    let rDesc='',rTemp='',rWind='',rRain='';
-    idx.forEach(hi=>{
+    html+='\n<span class="c-amber">\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 '+esc(day.date)+' \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500</span>\n';
+    // header row
+    html+='<span class="c-dim">'+cols.map(c=>esc(pad(c,COLW))).join('')+'</span>\n';
+    // gather art + data for the 4 slots
+    const slots=idx.map(hi=>{
       const h=day.hourly[Math.min(hi,day.hourly.length-1)];
       const dd=(h.lang_th&&h.lang_th[0]&&h.lang_th[0].value)||h.weatherDesc[0].value;
-      rDesc+=pad(dd.slice(0,13),15);
-      rTemp+=pad('+'+h.tempC+'\u00b0C',15);
-      rWind+=pad(windArrow(h.winddirDegree)+' '+h.windspeedKmph+'km/h',15);
-      rRain+=pad('\ud83d\udca7 '+h.chanceofrain+'%',15);
+      return { art:pickArt(h.weatherCode), h:h, dd:dd };
     });
-    html+='<span class="c-dim">'+esc(' '+cols.map(c=>pad(c,15)).join(''))+'</span>\n';
-    html+='<span class="c-white">'+esc(rDesc)+'</span>\n';
-    html+='<span class="c-orange">'+esc(rTemp)+'</span>\n';
-    html+='<span class="c-amber">'+esc(rWind)+'</span>\n';
-    html+='<span class="c-blue">'+esc(rRain)+'</span>\n';
+    // 5 art lines, joined across 4 columns
+    for(let ln=0; ln<5; ln++){
+      html+=slots.map(s=>padArtLine(s.art[ln])).join('')+'\n';
+    }
+    // data rows under the art
+    html+='<span class="c-white">'+slots.map(s=>esc(pad(s.dd.slice(0,15),COLW))).join('')+'</span>\n';
+    html+='<span class="c-orange">'+slots.map(s=>esc(pad('+'+s.h.tempC+'\u00b0C ('+s.h.FeelsLikeC+'\u00b0)',COLW))).join('')+'</span>\n';
+    html+='<span class="c-amber">'+slots.map(s=>esc(pad(windArrow(s.h.winddirDegree)+' '+s.h.windspeedKmph+' km/h',COLW))).join('')+'</span>\n';
+    html+='<span class="c-blue">'+slots.map(s=>esc(pad('\ud83d\udca7 '+s.h.chanceofrain+'% | '+s.h.precipMM+'mm',COLW))).join('')+'</span>\n';
   });
 
   out.innerHTML='<pre>'+html+'</pre>';
